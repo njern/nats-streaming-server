@@ -170,10 +170,12 @@ func createConnectionWithNatsOpts(t tLogger, clientName string,
 	}
 	nc, err := opts.Connect()
 	if err != nil {
+		fmt.Printf("@@IK: HERE!!!!!!!!!!!!!!!!!!!\n")
 		stackFatalf(t, "Unexpected error on connect: %v", err)
 	}
 	sc, err := stan.Connect(clusterName, clientName, stan.NatsConn(nc))
 	if err != nil {
+		fmt.Printf("@@IK: HERE2!!!!!!!!!!!!!!!!!!!!\n")
 		nc.Close()
 		stackFatalf(t, "Unexpected error on connect: %v", err)
 	}
@@ -3869,12 +3871,11 @@ func TestFileStoreNoPanicOnShutdown(t *testing.T) {
 		cleanupDatastore(t, defaultDataStore)
 		defer cleanupDatastore(t, defaultDataStore)
 
-		fmt.Printf("@@IK: Starting server\n")
 		s := RunServerWithOpts(opts, nil)
 		defer s.Shutdown()
 
 		// Start a go routine that keeps sending messages
-		sendQuit := make(chan bool)
+		sendQuit := make(chan bool, 1)
 		wg := &sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
@@ -3892,19 +3893,20 @@ func TestFileStoreNoPanicOnShutdown(t *testing.T) {
 				}
 			}
 		}()
+		fmt.Printf("@@IK: go func done\n")
 		// Wait for some messages to have been sent
+		fmt.Printf("@@IK: before time.Sleep\n")
 		time.Sleep(500 * time.Millisecond)
+		fmt.Printf("@@IK: after time.Sleep\n")
 		fmt.Printf("@@IK: Shutdown server\n")
 		// Shutdown the server, it should not panic
 		s.Shutdown()
 		// Stop and wait for go routine to end
-		fmt.Printf("@@IK: Notify sender to stop\n")
 		sendQuit <- true
-		fmt.Printf("@@IK: Waiting for senders to finish\n")
 		wg.Wait()
 		fmt.Printf("@@IK: Iteration done\n")
 	}
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 100; i++ {
 		test()
 	}
 }

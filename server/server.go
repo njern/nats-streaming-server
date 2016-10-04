@@ -1755,13 +1755,19 @@ func (s *StanServer) setupAckTimer(sub *subState, d time.Duration) {
 }
 
 func (s *StanServer) startStoreIOWriter() {
+	fmt.Printf("@@IK: ioChannelWG.Add(1)\n")
 	s.ioChannelWG.Add(1)
 	s.ioChannel = make(chan (*ioPendingMsg), ioChannelSize)
 	go s.storeIOLoop()
 }
 
 func (s *StanServer) storeIOLoop() {
-	defer s.ioChannelWG.Done()
+	defer func() {
+		fmt.Printf("@@IK: storeIOLoop exiting\n")
+		s.ioChannelWG.Done()
+		fmt.Printf("@@IK: storeIOLoop returning\n")
+	}()
+	fmt.Printf("@@IK: storeIOLoop starts\n")
 
 	////////////////////////////////////////////////////////////////////////////
 	// This is where we will store the message and wait for others in the
@@ -1782,7 +1788,9 @@ func (s *StanServer) storeIOLoop() {
 		cs, err := s.assignAndStore(iopm.pm)
 		if err != nil {
 			Errorf("STAN: [Client:%s] Error processing message for subject %q: %v", iopm.pm.ClientID, iopm.m.Subject, err)
+			fmt.Printf("@@IK: BEFORE SEND PUB ERROR\n")
 			s.sendPublishErr(iopm.m.Reply, iopm.pm.Guid, err)
+			fmt.Printf("@@IK: END SEND PUB ERROR\n")
 		} else {
 			pendingMsgs = append(pendingMsgs, iopm)
 			storesToFlush[cs] = struct{}{}
@@ -1844,12 +1852,14 @@ func (s *StanServer) storeIOLoop() {
 			for cs := range storesToFlush {
 				if err := cs.Msgs.Flush(); err != nil {
 					// TODO: Attempt recovery, notify publishers of error.
+					fmt.Printf("@@IK: @@@@@@@@@ PANIC HERE: %v\n", err)
 					panic(fmt.Errorf("Unable to flush msg store: %v", err))
 				}
 				// Call this here, so messages are sent to subscribers,
 				// which means that msg seq is added to subscription file
 				s.processMsg(cs)
 				if err := cs.Subs.Flush(); err != nil {
+					fmt.Printf("@@IK: @@@@@@@@@ PANIC HERE: %v\n", err)
 					panic(fmt.Errorf("Unable to flush sub store: %v", err))
 				}
 			}
@@ -2579,7 +2589,9 @@ func (s *StanServer) Shutdown() {
 	nc := s.nc
 	if s.ioChannel != nil {
 		// Notify the IO channel that we are shutting down
+		fmt.Printf("@@IK: notify ioChannelQuit\n")
 		s.ioChannelQuit <- true
+		fmt.Printf("@@IK: notify ioChannelQuit done\n")
 	} else {
 		waitForIOStoreLoop = false
 	}
@@ -2587,7 +2599,9 @@ func (s *StanServer) Shutdown() {
 
 	// Make sure the StoreIOLoop returns before closing the Store
 	if waitForIOStoreLoop {
+		fmt.Printf("@@IK: wait for channelWG\n")
 		s.ioChannelWG.Wait()
+		fmt.Printf("@@IK: channelWG done\n")
 	}
 
 	// Close/Shutdown resources. Note that unless one instantiates StanServer
