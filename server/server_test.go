@@ -3869,6 +3869,7 @@ func TestFileStoreNoPanicOnShutdown(t *testing.T) {
 		cleanupDatastore(t, defaultDataStore)
 		defer cleanupDatastore(t, defaultDataStore)
 
+		fmt.Printf("@@IK: Starting server\n")
 		s := RunServerWithOpts(opts, nil)
 		defer s.Shutdown()
 
@@ -3893,11 +3894,15 @@ func TestFileStoreNoPanicOnShutdown(t *testing.T) {
 		}()
 		// Wait for some messages to have been sent
 		time.Sleep(500 * time.Millisecond)
+		fmt.Printf("@@IK: Shutdown server\n")
 		// Shutdown the server, it should not panic
 		s.Shutdown()
 		// Stop and wait for go routine to end
+		fmt.Printf("@@IK: Notify sender to stop\n")
 		sendQuit <- true
+		fmt.Printf("@@IK: Waiting for senders to finish\n")
 		wg.Wait()
+		fmt.Printf("@@IK: Iteration done\n")
 	}
 	for i := 0; i < 3; i++ {
 		test()
